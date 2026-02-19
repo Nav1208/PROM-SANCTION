@@ -93,6 +93,25 @@ main {
   </div>
 </div>
 
+<!-- RESET ALL PASSWORD MODAL -->
+<div id="reset-all-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-bg">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 text-xl">⚠️</div>
+      <h3 class="text-lg font-bold text-red-500">Reset All Records</h3>
+    </div>
+    <p class="text-slate-500 dark:text-slate-400 text-sm mb-4">This will permanently reset <strong>ALL</strong> students' sanctions, attendance records, and payment data to zero. This cannot be undone.</p>
+    <label class="block text-xs font-mono text-slate-500 uppercase tracking-widest mb-1">Admin Password</label>
+    <input id="reset-all-password" type="password" placeholder="Enter password to confirm"
+      class="w-full border border-red-300 dark:border-red-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 mb-1" />
+    <p id="reset-all-error" class="text-red-500 text-xs mb-4 hidden">❌ Incorrect password. Access denied.</p>
+    <div class="flex gap-3 justify-end">
+      <button id="reset-all-cancel" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+      <button id="reset-all-confirm" class="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition">Reset Everything</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM MODAL -->
 <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-bg">
   <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
@@ -122,10 +141,40 @@ main {
 
 <!-- STUDENT MODAL -->
 <div id="student-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-bg">
-  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
     <h3 id="student-modal-title" class="text-lg font-bold mb-4">Add Student</h3>
+    <label class="block text-xs font-mono text-slate-500 uppercase tracking-widest mb-1">Student Name</label>
     <input id="student-name-input" type="text" placeholder="Student name"
       class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4" />
+
+    <!-- Edit-only sanction controls -->
+    <div id="edit-sanctions-section" class="hidden">
+      <div class="border-t border-slate-200 dark:border-slate-700 pt-4 mb-4">
+        <p class="text-xs font-mono text-slate-500 uppercase tracking-widest mb-3">Sanction Record Override</p>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Total Late Count</label>
+            <input id="edit-late-input" type="number" min="0" placeholder="0"
+              class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Total Absent Count</label>
+            <input id="edit-absent-input" type="number" min="0" placeholder="0"
+              class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="block text-xs font-medium text-slate-500 mb-1">Total Paid (₱)</label>
+          <input id="edit-paid-input" type="number" min="0" placeholder="0"
+            class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+        </div>
+        <div id="edit-sanction-preview" class="text-xs text-slate-400 font-mono bg-slate-50 dark:bg-slate-700/50 rounded-lg px-3 py-2 mb-3"></div>
+        <button id="reset-sanctions-btn" class="w-full py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 transition border border-red-200 dark:border-red-800">
+          ↩ Reset All Sanctions to Zero
+        </button>
+      </div>
+    </div>
+
     <div class="flex gap-3 justify-end">
       <button id="student-cancel" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
       <button id="student-ok" class="px-4 py-2 rounded-lg bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 transition">Save</button>
@@ -284,7 +333,13 @@ main {
     <div id="tab-students" class="tab-panel">
       <div class="flex flex-wrap gap-3 justify-between items-center mb-4">
         <h2 class="font-bold text-lg">Student Management</h2>
-        <button id="add-student-btn" class="px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition">+ Add Student</button>
+        <div class="flex gap-2 items-center">
+          <button id="reset-all-btn" class="admin-only hidden px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Reset All to Zero
+          </button>
+          <button id="add-student-btn" class="px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition">+ Add Student</button>
+        </div>
       </div>
       <div class="relative mb-4">
         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -385,6 +440,11 @@ window.addEventListener('DOMContentLoaded', function() {
   document.getElementById('logout-btn').onclick   = doLogout;
 
   document.getElementById('add-date-btn').onclick = addPracticeDate;
+  document.getElementById('reset-all-btn').onclick = function() { openResetAllModal(); };
+  document.getElementById('reset-all-cancel').onclick = function() { hideModal('reset-all-modal'); document.getElementById('reset-all-error').classList.add('hidden'); document.getElementById('reset-all-password').value = ''; };
+  document.getElementById('reset-all-confirm').onclick = submitResetAll;
+  document.getElementById('reset-all-password').onkeydown = function(e) { if (e.key === 'Enter') submitResetAll(); };
+
   document.getElementById('export-btn').onclick = exportCSV;
   document.getElementById('add-student-btn').onclick = openAddStudent;
   document.getElementById('student-search').oninput  = renderStudentsTab;
@@ -392,6 +452,12 @@ window.addEventListener('DOMContentLoaded', function() {
   document.getElementById('student-cancel').onclick  = function() { hideModal('student-modal'); };
   document.getElementById('student-ok').onclick      = submitStudent;
   document.getElementById('student-name-input').onkeydown = function(e) { if (e.key === 'Enter') submitStudent(); };
+  document.getElementById('edit-late-input').oninput   = updateSanctionPreview;
+  document.getElementById('edit-absent-input').oninput = updateSanctionPreview;
+  document.getElementById('edit-paid-input').oninput   = updateSanctionPreview;
+  document.getElementById('reset-sanctions-btn').onclick = function() {
+    if (editingStudentId) resetStudentSanctions(editingStudentId);
+  };
 
   document.getElementById('payment-cancel').onclick  = function() { hideModal('payment-modal'); };
   document.getElementById('payment-ok').onclick      = submitPayment;
@@ -746,7 +812,7 @@ async function recalcStudent(studentId) {
       if (s === 'Late')   late++;
       if (s === 'Absent') absent++;
     });
-    var sanctions = (late + absent) * 50;
+    var sanctions = (late * 10) + (absent * 50);
     var stuDoc = await db.collection('students').doc(studentId).get();
     var paid = stuDoc.exists ? (stuDoc.data().totalPaid || 0) : 0;
     var balance = Math.max(0, sanctions - paid);
@@ -931,6 +997,7 @@ function openAddStudent() {
   editingStudentId = null;
   document.getElementById('student-modal-title').textContent = 'Add Student';
   document.getElementById('student-name-input').value = '';
+  document.getElementById('edit-sanctions-section').classList.add('hidden');
   showModal('student-modal');
   setTimeout(function(){ document.getElementById('student-name-input').focus(); }, 50);
 }
@@ -939,8 +1006,31 @@ function openEditStudent(id, name) {
   editingStudentId = id;
   document.getElementById('student-modal-title').textContent = 'Edit Student';
   document.getElementById('student-name-input').value = name;
+  document.getElementById('edit-sanctions-section').classList.remove('hidden');
+
+  // Pre-fill current sanction values
+  var st = students.find(function(s){ return s.id === id; });
+  if (st) {
+    document.getElementById('edit-late-input').value   = st.totalLate   || 0;
+    document.getElementById('edit-absent-input').value = st.totalAbsent || 0;
+    document.getElementById('edit-paid-input').value   = st.totalPaid   || 0;
+    updateSanctionPreview();
+  }
+
   showModal('student-modal');
   setTimeout(function(){ document.getElementById('student-name-input').focus(); }, 50);
+}
+
+function updateSanctionPreview() {
+  var late    = parseInt(document.getElementById('edit-late-input').value)   || 0;
+  var absent  = parseInt(document.getElementById('edit-absent-input').value) || 0;
+  var paid    = parseFloat(document.getElementById('edit-paid-input').value)  || 0;
+  var sanctions = (late * 10) + (absent * 50);
+  var balance   = Math.max(0, sanctions - paid);
+  document.getElementById('edit-sanction-preview').innerHTML =
+    'Late ×₱10 + Absent ×₱50 = <strong>\u20B1' + sanctions.toLocaleString() + '</strong> &nbsp;|&nbsp; ' +
+    'Paid: <strong>\u20B1' + paid.toLocaleString() + '</strong> &nbsp;|&nbsp; ' +
+    'Balance: <strong class="text-red-400">\u20B1' + balance.toLocaleString() + '</strong>';
 }
 
 async function submitStudent() {
@@ -948,7 +1038,19 @@ async function submitStudent() {
   if (!name) { toast('Name is required.', 'error'); return; }
   try {
     if (editingStudentId) {
-      await db.collection('students').doc(editingStudentId).update({ name: name });
+      var late    = parseInt(document.getElementById('edit-late-input').value)   || 0;
+      var absent  = parseInt(document.getElementById('edit-absent-input').value) || 0;
+      var paid    = parseFloat(document.getElementById('edit-paid-input').value)  || 0;
+      var sanctions = (late * 10) + (absent * 50);
+      var balance   = Math.max(0, sanctions - paid);
+      await db.collection('students').doc(editingStudentId).update({
+        name: name,
+        totalLate: late,
+        totalAbsent: absent,
+        totalSanctions: sanctions,
+        totalPaid: paid,
+        remainingBalance: balance
+      });
       toast('Student updated!', 'success');
     } else {
       await db.collection('students').add({ name: name, totalLate: 0, totalAbsent: 0, totalSanctions: 0, totalPaid: 0, remainingBalance: 0 });
@@ -956,6 +1058,25 @@ async function submitStudent() {
     }
     hideModal('student-modal');
   } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+}
+
+async function resetStudentSanctions(id) {
+  openConfirm('Reset ALL sanctions for this student to zero? This will clear late count, absent count, paid amount, and balance. Attendance records are NOT deleted.', async function() {
+    try {
+      await db.collection('students').doc(id).update({
+        totalLate: 0, totalAbsent: 0, totalSanctions: 0, totalPaid: 0, remainingBalance: 0
+      });
+      // Also delete all attendance records for this student so they don't re-calc
+      var snap = await db.collection('attendance').where('studentId', '==', id).get();
+      if (!snap.empty) {
+        var batch = db.batch();
+        snap.docs.forEach(function(d){ batch.delete(d.ref); });
+        await batch.commit();
+      }
+      hideModal('student-modal');
+      toast('Sanctions reset to zero.', 'info');
+    } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+  });
 }
 
 async function deleteStudent(id, name) {
@@ -997,6 +1118,58 @@ async function submitPayment() {
     toast('Payment of \u20B1' + amount + ' recorded!', 'success');
     hideModal('payment-modal');
   } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+}
+
+/* ============================================================
+   RESET ALL TO ZERO
+============================================================ */
+function openResetAllModal() {
+  if (!isAdmin) { toast('Admin access required.', 'error'); return; }
+  document.getElementById('reset-all-password').value = '';
+  document.getElementById('reset-all-error').classList.add('hidden');
+  showModal('reset-all-modal');
+  setTimeout(function(){ document.getElementById('reset-all-password').focus(); }, 50);
+}
+
+async function submitResetAll() {
+  var pwd = document.getElementById('reset-all-password').value;
+  var RESET_PASSWORD = '@EcoreEst2021';
+  if (pwd !== RESET_PASSWORD) {
+    document.getElementById('reset-all-error').classList.remove('hidden');
+    document.getElementById('reset-all-password').value = '';
+    document.getElementById('reset-all-password').focus();
+    return;
+  }
+  document.getElementById('reset-all-error').classList.add('hidden');
+  hideModal('reset-all-modal');
+  showLoading();
+  try {
+    // Delete all attendance records
+    var attSnap = await db.collection('attendance').get();
+    if (!attSnap.empty) {
+      var batch1 = db.batch();
+      attSnap.docs.forEach(function(d){ batch1.delete(d.ref); });
+      await batch1.commit();
+    }
+    // Delete all practice dates
+    var dateSnap = await db.collection('practiceDates').get();
+    if (!dateSnap.empty) {
+      var batch2 = db.batch();
+      dateSnap.docs.forEach(function(d){ batch2.delete(d.ref); });
+      await batch2.commit();
+    }
+    // Reset all student records to zero
+    var stuSnap = await db.collection('students').get();
+    if (!stuSnap.empty) {
+      var batch3 = db.batch();
+      stuSnap.docs.forEach(function(d){
+        batch3.update(d.ref, { totalLate: 0, totalAbsent: 0, totalSanctions: 0, totalPaid: 0, remainingBalance: 0 });
+      });
+      await batch3.commit();
+    }
+    toast('All records have been reset to zero.', 'info');
+  } catch(e) { console.error(e); toast('Error during reset: ' + e.message, 'error'); }
+  hideLoading();
 }
 
 /* ============================================================
