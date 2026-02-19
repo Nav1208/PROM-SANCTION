@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attendance &amp; Sanctions System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { mono: ['Space Mono','monospace'], sans: ['DM Sans','sans-serif'] },
+          colors: { brand: { 50:'#fff7ed',100:'#ffedd5',400:'#fb923c',500:'#f97316',600:'#ea580c',700:'#c2410c' } }
+        }
+      }
+    }
+  </script>
+  <tag>
+    <!--Nag pa help ako sa AI So hard men-->
+  </tag>
+  <style>
+    body{font-family:'DM Sans',sans-serif}
+    ::-webkit-scrollbar{width:6px;height:4px}
+    ::-webkit-scrollbar-thumb{background:#0000FF;border-radius:99px}
+    #toast-container{position:fixed;top:1.25rem;right:1.25rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;pointer-events:none}
+    .toast{pointer-events:auto;padding:.75rem 1.25rem;border-radius:.5rem;font-size:.875rem;font-weight:500;color:#fff;animation:slideIn .3s ease;max-width:320px;box-shadow:0 8px 30px rgba(0,0,0,.2)}
+    .toast.success{background:#16a34a}.toast.error{background:#dc2626}.toast.info{background:#2563eb}
+    @keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+    @keyframes fadeOut{to{opacity:0;transform:translateX(110%)}}
+    .spinner{border:3px solid rgba(249,115,22,.2);border-top-color:#f97316;border-radius:50%;width:2rem;height:2rem;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .tab-panel{display:none}.tab-panel.active{display:block}
+    .badge-cleared{background:#dcfce7;color:#15803d}.badge-balance{background:#fee2e2;color:#b91c1c}
+    .dark .badge-cleared{background:#14532d;color:#86efac}.dark .badge-balance{background:#450a0a;color:#fca5a5}
+    .stat-card{transition:transform .2s}.stat-card:hover{transform:translateY(-2px)}
+    table{border-collapse:separate;border-spacing:0}
+    thead th{position:sticky;top:0;z-index:1}
+    .nav-tab{transition:color .2s,border-color .2s;border-bottom:2px solid transparent}
+    .nav-tab.active{color:#f97316;border-bottom-color:#f97316}
+    .modal-bg{background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50%       { transform: scale(1.08); opacity: .85; }
+    }
+    
+    
+    #app::before {
+  content: '';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 420px;
+  height: 420px;
+  background-image: url('sslg.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
+}
+
+main {
+  position: relative;
+  z-index: 1;
+}
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
+
+<div id="toast-container"></div>
+
+<!-- LOADING — FIX 1: removed duplicate src/style attributes -->
+<div id="loading-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900">
+  <div class="flex flex-col items-center gap-4" style="animation: fadeInUp .6s ease forwards">
+    <img
+      id="loading-logo"
+      src="sslg.png"
+      alt="SSLG Logo"
+      style="width:160px; height:160px; object-fit:contain; animation: pulse 1.5s ease-in-out infinite"
+    />
+    <p class="text-white font-mono text-sm tracking-widest">Wait lang Teh</p>
+    <div class="spinner" style="width:1.5rem;height:1.5rem;border-width:3px"></div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-bg">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+    <h3 class="text-lg font-bold mb-2">Confirm Delete</h3>
+    <p id="confirm-text" class="text-slate-500 dark:text-slate-400 text-sm mb-5"></p>
+    <div class="flex gap-3 justify-end">
+      <button id="confirm-cancel" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+      <button id="confirm-ok" class="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div id="payment-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-bg">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+    <h3 class="text-lg font-bold mb-1">Record Payment</h3>
+    <p id="payment-name" class="text-sm text-slate-500 dark:text-slate-400 mb-4"></p>
+    <label class="block text-sm font-medium mb-1">Amount (&#8369;)</label>
+    <input id="payment-amount" type="number" min="1" placeholder="Enter amount"
+      class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4" />
+    <div class="flex gap-3 justify-end">
+      <button id="payment-cancel" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+      <button id="payment-ok" class="px-4 py-2 rounded-lg bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 transition">Record</button>
+    </div>
+  </div>
+</div>
+
+<!-- STUDENT MODAL -->
+<div id="student-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-bg">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+    <h3 id="student-modal-title" class="text-lg font-bold mb-4">Add Student</h3>
+    <input id="student-name-input" type="text" placeholder="Student name"
+      class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4" />
+    <div class="flex gap-3 justify-end">
+      <button id="student-cancel" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+      <button id="student-ok" class="px-4 py-2 rounded-lg bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 transition">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN PANEL -->
+<div id="login-panel" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-bg">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
+    <div class="flex items-center gap-3 mb-6">
+     <div class="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
+  <img src="sslg.png" alt="SSLG" class="w-full h-full object-contain" />
+</div>
+      <h2 class="text-xl font-bold">Admin Login</h2>
+    </div>
+    <input id="login-email" type="email" placeholder="Email"
+      class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-3" />
+    <input id="login-password" type="password" placeholder="Password"
+      class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4" />
+    <button id="login-submit" class="w-full py-2.5 rounded-xl bg-brand-500 text-white font-semibold hover:bg-brand-600 transition mb-3">Sign In</button>
+    <button id="login-cancel" class="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden min-h-screen flex flex-col">
+
+  <header class="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+     <div class="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center">
+  <img src="sslg.png" alt="SSLG" class="w-full h-full object-contain" />
+</div>
+        <div>
+          <h1 class="font-bold text-base leading-tight">Attendance &amp; Sanctions</h1>
+          <p id="header-role" class="text-xs text-slate-400 dark:text-slate-500 font-mono">Public View</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="dark-toggle" title="Toggle dark mode"
+          class="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-500 dark:text-slate-400">
+          <svg id="icon-moon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+          <svg id="icon-sun" class="w-4 h-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+        </button>
+        <button id="login-btn" class="px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition">Admin Login</button>
+        <button id="logout-btn" class="hidden px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition">Logout</button>
+      </div>
+    </div>
+    <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
+      <button class="nav-tab active px-4 py-2.5 text-sm font-medium whitespace-nowrap" data-tab="dashboard">Dashboard</button>
+      <button class="nav-tab px-4 py-2.5 text-sm font-medium whitespace-nowrap" data-tab="attendance">Attendance</button>
+      <button class="nav-tab px-4 py-2.5 text-sm font-medium whitespace-nowrap" data-tab="sanctions">Sanctions</button>
+      <button class="nav-tab px-4 py-2.5 text-sm font-medium whitespace-nowrap" data-tab="leaderboard">Leaderboard</button>
+      <button class="nav-tab admin-only hidden px-4 py-2.5 text-sm font-medium whitespace-nowrap" data-tab="students">Students</button>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="tab-panel active">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700 shadow-sm">
+          <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Students</p>
+          <p id="stat-students" class="text-3xl font-bold font-mono text-brand-500">0</p>
+        </div>
+        <div class="stat-card bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700 shadow-sm">
+          <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Total Sanctions</p>
+          <p id="stat-sanctions" class="text-3xl font-bold font-mono text-red-500">&#8369;0</p>
+        </div>
+        <div class="stat-card bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700 shadow-sm">
+          <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Collected</p>
+          <p id="stat-collected" class="text-3xl font-bold font-mono text-green-500">&#8369;0</p>
+        </div>
+        <div class="stat-card bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700 shadow-sm">
+          <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Outstanding</p>
+          <p id="stat-outstanding" class="text-3xl font-bold font-mono text-amber-500">&#8369;0</p>
+        </div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-5">
+        <h2 class="font-bold text-base mb-4">Sanctions Overview</h2>
+        <div class="relative h-64"><canvas id="sanctions-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ATTENDANCE -->
+    <div id="tab-attendance" class="tab-panel">
+      <div id="add-date-section" class="hidden mb-5 flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="block text-xs font-mono text-slate-500 mb-1 uppercase tracking-widest">Practice Date</label>
+          <input id="new-date-input" type="date"
+            class="border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+        <button id="add-date-btn" class="px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition">+ Add Date</button>
+      </div>
+      <div id="dates-container" class="space-y-4"></div>
+      <p id="no-dates-msg" class="hidden text-center py-10 text-slate-400 font-mono text-sm">No practice dates yet.</p>
+    </div>
+
+    <!-- SANCTIONS -->
+    <div id="tab-sanctions" class="tab-panel">
+      <div class="flex flex-wrap gap-3 justify-between items-center mb-5">
+        <h2 class="font-bold text-lg">Sanctions &amp; Payments</h2>
+        <button id="export-btn" class="px-4 py-2 rounded-xl border border-brand-500 text-brand-600 dark:text-brand-400 text-sm font-semibold hover:bg-brand-50 dark:hover:bg-brand-500/10 transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Export to CSV
+        </button>
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 dark:bg-slate-700/50 text-xs font-mono uppercase tracking-widest text-slate-500">
+              <tr>
+                <th class="px-4 py-3 text-left">#</th>
+                <th class="px-4 py-3 text-left">Name</th>
+                <th class="px-4 py-3 text-center">Late</th>
+                <th class="px-4 py-3 text-center">Absent</th>
+                <th class="px-4 py-3 text-right">Sanctions</th>
+                <th class="px-4 py-3 text-right">Paid</th>
+                <th class="px-4 py-3 text-right">Balance</th>
+                <th class="px-4 py-3 text-center">Status</th>
+                <th class="px-4 py-3 text-center admin-only hidden">Action</th>
+              </tr>
+            </thead>
+            <tbody id="sanctions-tbody" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div id="tab-leaderboard" class="tab-panel">
+      <h2 class="font-bold text-lg mb-5">&#127942; Leaderboard</h2>
+      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 dark:bg-slate-700/50 text-xs font-mono uppercase tracking-widest text-slate-500">
+              <tr>
+                <th class="px-4 py-3 text-left">Rank</th>
+                <th class="px-4 py-3 text-left">Name</th>
+                <th class="px-4 py-3 text-center">Late</th>
+                <th class="px-4 py-3 text-center">Absent</th>
+                <th class="px-4 py-3 text-right">Sanctions</th>
+                <th class="px-4 py-3 text-right">Balance</th>
+                <th class="px-4 py-3 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-tbody" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- STUDENTS -->
+    <div id="tab-students" class="tab-panel">
+      <div class="flex flex-wrap gap-3 justify-between items-center mb-4">
+        <h2 class="font-bold text-lg">Student Management</h2>
+        <button id="add-student-btn" class="px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition">+ Add Student</button>
+      </div>
+      <div class="relative mb-4">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+        </svg>
+        <input id="student-search" type="text" placeholder="Search students..."
+          class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 dark:bg-slate-700/50 text-xs font-mono uppercase tracking-widest text-slate-500">
+              <tr>
+                <th class="px-4 py-3 text-left">#</th>
+                <th class="px-4 py-3 text-left">Name</th>
+                <th class="px-4 py-3 text-center">Absences</th>
+                <th class="px-4 py-3 text-center">Late</th>
+                <th class="px-4 py-3 text-right">Balance</th>
+                <th class="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="students-tbody" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="text-center py-4 text-xs text-slate-400 font-mono">
+    Attendance Ni Ate Mo
+  </footer>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyCtXBrH_48U34jw_KrbAZSCpXTY2qfSqEg",
+  authDomain: "areyouatecha.firebaseapp.com",
+  projectId: "areyouatecha",
+  storageBucket: "areyouatecha.firebasestorage.app",
+  messagingSenderId: "628406103719",
+  appId: "1:628406103719:web:6d1f336ee0a79e877f3582"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+let isAdmin       = false;
+let students      = [];
+let practiceDates = [];
+let attendanceMap = {};
+let sanctionsChart   = null;
+let editingStudentId = null;
+let payingStudentId  = null;
+let pendingConfirm   = null;
+
+(function() {
+  var saved = localStorage.getItem('theme');
+  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+    document.getElementById('icon-moon').classList.add('hidden');
+    document.getElementById('icon-sun').classList.remove('hidden');
+  }
+})();
+
+/* ============================================================
+   FIX 2: fadeOutLoader with called-guard so it never runs twice
+============================================================ */
+function fadeOutLoader() {
+  if (fadeOutLoader.called) return;
+  fadeOutLoader.called = true;
+  var overlay = document.getElementById('loading-overlay');
+  overlay.style.transition = 'opacity .8s ease';
+  overlay.style.opacity = '0';
+  setTimeout(function() {
+    hideLoading();
+    showApp();
+  }, 800);
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('new-date-input').value = new Date().toISOString().split('T')[0];
+
+  document.getElementById('dark-toggle').onclick = function() {
+    var d = document.documentElement.classList.toggle('dark');
+    document.getElementById('icon-moon').classList.toggle('hidden', d);
+    document.getElementById('icon-sun').classList.toggle('hidden', !d);
+    localStorage.setItem('theme', d ? 'dark' : 'light');
+    setTimeout(renderChart, 80);
+  };
+  document.getElementById('login-btn').onclick    = function() { showModal('login-panel'); };
+  document.getElementById('login-cancel').onclick = function() { hideModal('login-panel'); };
+  document.getElementById('login-submit').onclick = doLogin;
+  document.getElementById('login-password').onkeydown = function(e) { if (e.key === 'Enter') doLogin(); };
+  document.getElementById('logout-btn').onclick   = doLogout;
+
+  document.getElementById('add-date-btn').onclick = addPracticeDate;
+  document.getElementById('export-btn').onclick = exportCSV;
+  document.getElementById('add-student-btn').onclick = openAddStudent;
+  document.getElementById('student-search').oninput  = renderStudentsTab;
+
+  document.getElementById('student-cancel').onclick  = function() { hideModal('student-modal'); };
+  document.getElementById('student-ok').onclick      = submitStudent;
+  document.getElementById('student-name-input').onkeydown = function(e) { if (e.key === 'Enter') submitStudent(); };
+
+  document.getElementById('payment-cancel').onclick  = function() { hideModal('payment-modal'); };
+  document.getElementById('payment-ok').onclick      = submitPayment;
+  document.getElementById('payment-amount').onkeydown = function(e) { if (e.key === 'Enter') submitPayment(); };
+
+  document.getElementById('confirm-cancel').onclick  = function() { hideModal('confirm-modal'); pendingConfirm = null; };
+  document.getElementById('confirm-ok').onclick      = function() {
+    hideModal('confirm-modal');
+    if (pendingConfirm) { var fn = pendingConfirm; pendingConfirm = null; fn(); }
+  };
+
+  document.querySelectorAll('.nav-tab').forEach(function(btn) {
+    btn.onclick = function() { switchTab(btn.dataset.tab); };
+  });
+
+  document.getElementById('dates-container').addEventListener('click', onAttendanceClick);
+  document.getElementById('sanctions-tbody').addEventListener('click', onSanctionsClick);
+  document.getElementById('students-tbody').addEventListener('click', onStudentsClick);
+
+  /* ============================================================
+     FIX 3: auth waits for logo to load, 3s safety fallback
+  ============================================================ */
+auth.onAuthStateChanged(function(user) {
+    isAdmin = !!user;
+    updateAuthUI(user);
+
+    // Always wait the FULL 5 seconds before showing app
+    setTimeout(fadeOutLoader, 3000);
+  });
+
+  listenStudents();
+  listenPracticeDates();
+  listenAttendance();
+});
+
+/* ============================================================
+   EVENT DELEGATION
+============================================================ */
+function onAttendanceClick(e) {
+  var btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  var action = btn.dataset.action;
+  if (action === 'delete-date') deletePracticeDate(btn.dataset.dateId);
+  else if (action === 'mark')   markAttendance(btn.dataset.dateId, btn.dataset.studentId, btn.dataset.status);
+}
+
+function onSanctionsClick(e) {
+  var btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'pay') openPaymentModal(btn.dataset.id, btn.dataset.name);
+}
+
+function onStudentsClick(e) {
+  var btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'edit')   openEditStudent(btn.dataset.id, btn.dataset.name);
+  if (btn.dataset.action === 'delete') deleteStudent(btn.dataset.id, btn.dataset.name);
+}
+
+/* ============================================================
+   AUTH
+============================================================ */
+function updateAuthUI(user) {
+  if (user) {
+    document.getElementById('login-btn').classList.add('hidden');
+    document.getElementById('logout-btn').classList.remove('hidden');
+    document.getElementById('header-role').textContent = 'Admin: ' + user.email;
+    document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.remove('hidden'); });
+    document.getElementById('add-date-section').classList.remove('hidden');
+  } else {
+    document.getElementById('login-btn').classList.remove('hidden');
+    document.getElementById('logout-btn').classList.add('hidden');
+    document.getElementById('header-role').textContent = 'Public View';
+    document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.add('hidden'); });
+    document.getElementById('add-date-section').classList.add('hidden');
+  }
+}
+
+async function doLogin() {
+  var email = document.getElementById('login-email').value.trim();
+  var pass  = document.getElementById('login-password').value;
+  if (!email || !pass) { toast('Enter email and password.', 'error'); return; }
+  showLoading();
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    hideModal('login-panel');
+    toast('Logged in!', 'success');
+  } catch(e) {
+    toast('Login failed: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+async function doLogout() {
+  await auth.signOut();
+  toast('Logged out.', 'info');
+}
+
+/* ============================================================
+   FIRESTORE LISTENERS
+============================================================ */
+function listenStudents() {
+  db.collection('students').orderBy('name').onSnapshot(function(snap) {
+    students = snap.docs.map(function(d) { return Object.assign({ id: d.id }, d.data()); });
+    renderAll();
+  }, function(e) { console.error('Students:', e); });
+}
+
+function listenPracticeDates() {
+  db.collection('practiceDates').orderBy('date').onSnapshot(function(snap) {
+    practiceDates = snap.docs.map(function(d) { return Object.assign({ id: d.id }, d.data()); });
+    renderAttendanceTab();
+  }, function(e) { console.error('PracticeDates:', e); });
+}
+
+function listenAttendance() {
+  db.collection('attendance').onSnapshot(function(snap) {
+    attendanceMap = {};
+    snap.docs.forEach(function(d) {
+      var data = d.data();
+      if (!attendanceMap[data.dateId]) attendanceMap[data.dateId] = {};
+      attendanceMap[data.dateId][data.studentId] = data.status;
+    });
+    renderAttendanceTab();
+  }, function(e) { console.error('Attendance:', e); });
+}
+
+/* ============================================================
+   RENDER ALL
+============================================================ */
+function renderAll() {
+  renderDashboard();
+  renderSanctions();
+  renderLeaderboard();
+  renderStudentsTab();
+}
+
+/* ============================================================
+   DASHBOARD
+============================================================ */
+function renderDashboard() {
+  var ts = students.reduce(function(s,st){ return s+(st.totalSanctions||0); }, 0);
+  var tp = students.reduce(function(s,st){ return s+(st.totalPaid||0); }, 0);
+  var to = students.reduce(function(s,st){ return s+(st.remainingBalance||0); }, 0);
+  document.getElementById('stat-students').textContent    = students.length;
+  document.getElementById('stat-sanctions').textContent   = '\u20B1' + ts.toLocaleString();
+  document.getElementById('stat-collected').textContent   = '\u20B1' + tp.toLocaleString();
+  document.getElementById('stat-outstanding').textContent = '\u20B1' + to.toLocaleString();
+  renderChart();
+}
+
+function renderChart() {
+  var ctx   = document.getElementById('sanctions-chart').getContext('2d');
+  var top10 = sortedStudents().slice(0, 10);
+  var dark  = document.documentElement.classList.contains('dark');
+  var grid  = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)';
+  var text  = dark ? '#94a3b8' : '#64748b';
+  if (sanctionsChart) sanctionsChart.destroy();
+  sanctionsChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top10.map(function(s){ return s.name; }),
+      datasets: [
+        { label: 'Total Sanctions', data: top10.map(function(s){ return s.totalSanctions||0; }), backgroundColor: 'rgba(249,115,22,.8)', borderRadius: 6 },
+        { label: 'Remaining Balance', data: top10.map(function(s){ return s.remainingBalance||0; }), backgroundColor: 'rgba(239,68,68,.6)', borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: text, font: { family: 'DM Sans', size: 12 } } } },
+      scales: {
+        x: { ticks: { color: text }, grid: { color: grid } },
+        y: { ticks: { color: text, callback: function(v){ return '\u20B1'+v; } }, grid: { color: grid } }
+      }
+    }
+  });
+}
+
+/* ============================================================
+   ATTENDANCE TAB
+============================================================ */
+function renderAttendanceTab() {
+  var container = document.getElementById('dates-container');
+  var noMsg     = document.getElementById('no-dates-msg');
+  container.innerHTML = '';
+
+  if (practiceDates.length === 0) { noMsg.classList.remove('hidden'); return; }
+  noMsg.classList.add('hidden');
+
+  var sorted = practiceDates.slice().reverse();
+
+  sorted.forEach(function(pd) {
+    var att = attendanceMap[pd.id] || {};
+
+    var card = document.createElement('div');
+    card.className = 'bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden';
+
+    var hdr = document.createElement('div');
+    hdr.className = 'flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700';
+    var span = document.createElement('span');
+    span.className = 'font-mono font-bold text-brand-500';
+    span.textContent = formatDate(pd.date);
+    hdr.appendChild(span);
+
+    if (isAdmin) {
+      var delDateBtn = document.createElement('button');
+      delDateBtn.className = 'text-red-400 hover:text-red-500 text-xs font-mono transition';
+      delDateBtn.textContent = 'Delete Date';
+      delDateBtn.dataset.action = 'delete-date';
+      delDateBtn.dataset.dateId = pd.id;
+      hdr.appendChild(delDateBtn);
+    }
+    card.appendChild(hdr);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'overflow-x-auto';
+    var tbl  = document.createElement('table');
+    tbl.className = 'w-full text-sm';
+
+    var thead = document.createElement('thead');
+    var hrow  = document.createElement('tr');
+    ['Student','Present','Late','Absent','Status'].forEach(function(h, i) {
+      var th = document.createElement('th');
+      th.className = 'px-4 py-2 text-xs font-mono uppercase tracking-widest text-slate-400 ' + (i === 0 ? 'text-left' : 'text-center');
+      th.textContent = h;
+      hrow.appendChild(th);
+    });
+    thead.appendChild(hrow);
+    tbl.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    tbody.className = 'divide-y divide-slate-100 dark:divide-slate-700';
+
+    students.forEach(function(st) {
+      var status = att[st.id] || null;
+      var tr = document.createElement('tr');
+
+      var nameTd = document.createElement('td');
+      nameTd.className = 'px-4 py-2.5 font-medium';
+      nameTd.textContent = st.name;
+      tr.appendChild(nameTd);
+
+      ['Present','Late','Absent'].forEach(function(v) {
+        var tdEl = document.createElement('td');
+        tdEl.className = 'px-4 py-2.5 text-center';
+        var btn = document.createElement('button');
+        btn.textContent = v;
+        btn.dataset.action    = 'mark';
+        btn.dataset.dateId    = pd.id;
+        btn.dataset.studentId = st.id;
+        btn.dataset.status    = v;
+        var selected = status === v;
+        btn.className = 'px-3 py-1 rounded-lg text-xs font-semibold transition ' +
+          (selected ? 'bg-brand-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600');
+        if (!isAdmin) { btn.disabled = true; btn.classList.add('opacity-50','cursor-not-allowed'); }
+        tdEl.appendChild(btn);
+        tr.appendChild(tdEl);
+      });
+
+      var stTd = document.createElement('td');
+      stTd.className = 'px-4 py-2.5 text-center';
+      if (status) {
+        var badge = document.createElement('span');
+        badge.className = 'text-xs font-mono px-2 py-1 rounded-lg ' + statusBg(status);
+        badge.textContent = status;
+        stTd.appendChild(badge);
+      } else {
+        stTd.innerHTML = '<span class="text-xs text-slate-400">&mdash;</span>';
+      }
+      tr.appendChild(stTd);
+      tbody.appendChild(tr);
+    });
+
+    tbl.appendChild(tbody);
+    wrap.appendChild(tbl);
+    card.appendChild(wrap);
+    container.appendChild(card);
+  });
+}
+
+function statusBg(s) {
+  if (s === 'Present') return 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
+  if (s === 'Late')    return 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300';
+  return 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
+}
+
+/* ============================================================
+   ADD / DELETE PRACTICE DATE
+============================================================ */
+async function addPracticeDate() {
+  if (!isAdmin) { toast('Admin access required.', 'error'); return; }
+  var val = document.getElementById('new-date-input').value;
+  if (!val) { toast('Select a date first.', 'error'); return; }
+  if (practiceDates.some(function(p){ return p.date === val; })) { toast('Date already exists.', 'error'); return; }
+  try {
+    await db.collection('practiceDates').add({ date: val });
+    toast('Practice date added!', 'success');
+  } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+}
+
+async function deletePracticeDate(dateId) {
+  openConfirm('Delete this practice date and all its attendance records?', async function() {
+    try {
+      var snap = await db.collection('attendance').where('dateId', '==', dateId).get();
+      var affected = [];
+      snap.docs.forEach(function(d) {
+        var sid = d.data().studentId;
+        if (affected.indexOf(sid) === -1) affected.push(sid);
+      });
+      if (!snap.empty) {
+        var batch = db.batch();
+        snap.docs.forEach(function(d) { batch.delete(d.ref); });
+        await batch.commit();
+      }
+      await db.collection('practiceDates').doc(dateId).delete();
+      for (var i = 0; i < affected.length; i++) {
+        await recalcStudent(affected[i]);
+      }
+      toast('Practice date deleted.', 'info');
+    } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+  });
+}
+
+/* ============================================================
+   MARK ATTENDANCE
+============================================================ */
+async function markAttendance(dateId, studentId, status) {
+  if (!isAdmin) { toast('Admin access required.', 'error'); return; }
+  try {
+    var snap = await db.collection('attendance')
+      .where('dateId', '==', dateId)
+      .where('studentId', '==', studentId).get();
+    if (snap.empty) {
+      await db.collection('attendance').add({ dateId: dateId, studentId: studentId, status: status });
+    } else {
+      await snap.docs[0].ref.update({ status: status });
+    }
+    await recalcStudent(studentId);
+    toast('Marked ' + status, 'success');
+  } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+}
+
+/* ============================================================
+   RECALC STUDENT
+============================================================ */
+async function recalcStudent(studentId) {
+  try {
+    var snap = await db.collection('attendance').where('studentId', '==', studentId).get();
+    var late = 0, absent = 0;
+    snap.docs.forEach(function(d) {
+      var s = d.data().status;
+      if (s === 'Late')   late++;
+      if (s === 'Absent') absent++;
+    });
+    var sanctions = (late + absent) * 50;
+    var stuDoc = await db.collection('students').doc(studentId).get();
+    var paid = stuDoc.exists ? (stuDoc.data().totalPaid || 0) : 0;
+    var balance = Math.max(0, sanctions - paid);
+    await db.collection('students').doc(studentId).update({
+      totalLate: late, totalAbsent: absent, totalSanctions: sanctions, remainingBalance: balance
+    });
+  } catch(e) { console.error('Recalc error:', e); }
+}
+
+/* ============================================================
+   SANCTIONS TAB
+============================================================ */
+function renderSanctions() {
+  var tbody  = document.getElementById('sanctions-tbody');
+  var sorted = sortedStudents();
+  tbody.innerHTML = '';
+
+  if (sorted.length === 0) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="9" class="text-center py-8 text-slate-400 font-mono text-sm">No students yet.</td>';
+    tbody.appendChild(tr);
+    syncAdminCols();
+    return;
+  }
+
+  sorted.forEach(function(st, i) {
+    var cleared = (st.remainingBalance || 0) === 0 && (st.totalSanctions || 0) > 0;
+    var tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-700/30 transition';
+
+    td(tr, (i+1), 'px-4 py-3 font-mono text-slate-400 text-xs');
+    var nameTd = td(tr, '', 'px-4 py-3 font-semibold');
+    nameTd.textContent = st.name;
+    td(tr, st.totalLate||0,   'px-4 py-3 text-center text-amber-500 font-mono');
+    td(tr, st.totalAbsent||0, 'px-4 py-3 text-center text-red-500 font-mono');
+    td(tr, '\u20B1'+(st.totalSanctions||0).toLocaleString(),  'px-4 py-3 text-right font-mono');
+    td(tr, '\u20B1'+(st.totalPaid||0).toLocaleString(),       'px-4 py-3 text-right font-mono text-green-600');
+    td(tr, '\u20B1'+(st.remainingBalance||0).toLocaleString(),'px-4 py-3 text-right font-mono font-bold text-red-500');
+
+    var badgeTd = document.createElement('td');
+    badgeTd.className = 'px-4 py-3 text-center';
+    var badge = document.createElement('span');
+    badge.className = (cleared ? 'badge-cleared' : 'badge-balance') + ' text-xs font-semibold px-2 py-1 rounded-lg';
+    badge.textContent = cleared ? 'Cleared' : 'With Balance';
+    badgeTd.appendChild(badge);
+    tr.appendChild(badgeTd);
+
+    var actionTd = document.createElement('td');
+    actionTd.className = 'px-4 py-3 text-center admin-only' + (isAdmin ? '' : ' hidden');
+    if (isAdmin) {
+      var payBtn = document.createElement('button');
+      payBtn.textContent = 'Pay';
+      payBtn.className = 'text-xs px-3 py-1.5 rounded-lg bg-green-500 text-white font-semibold hover:bg-green-600 transition';
+      payBtn.dataset.action = 'pay';
+      payBtn.dataset.id     = st.id;
+      payBtn.dataset.name   = st.name;
+      actionTd.appendChild(payBtn);
+    }
+    tr.appendChild(actionTd);
+    tbody.appendChild(tr);
+  });
+
+  syncAdminCols();
+}
+
+function td(tr, text, cls) {
+  var el = document.createElement('td');
+  el.className = cls;
+  el.textContent = text;
+  tr.appendChild(el);
+  return el;
+}
+
+function syncAdminCols() {
+  document.querySelectorAll('.admin-only').forEach(function(el) {
+    el.classList.toggle('hidden', !isAdmin);
+  });
+}
+
+/* ============================================================
+   LEADERBOARD
+============================================================ */
+function renderLeaderboard() {
+  var tbody  = document.getElementById('leaderboard-tbody');
+  var sorted = sortedStudents();
+  tbody.innerHTML = '';
+
+  if (sorted.length === 0) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="7" class="text-center py-8 text-slate-400 font-mono text-sm">No students yet.</td>';
+    tbody.appendChild(tr);
+    return;
+  }
+
+  var medals = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
+
+  sorted.forEach(function(st, i) {
+    var cleared = (st.remainingBalance||0) === 0 && (st.totalSanctions||0) > 0;
+    var tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-700/30 transition';
+
+    var rankTd = document.createElement('td');
+    rankTd.className = 'px-4 py-3 text-lg';
+    rankTd.textContent = i < 3 ? medals[i] : '#'+(i+1);
+    tr.appendChild(rankTd);
+
+    var nameTd = td(tr, '', 'px-4 py-3 font-semibold');
+    nameTd.textContent = st.name;
+    td(tr, st.totalLate||0,   'px-4 py-3 text-center font-mono text-amber-500');
+    td(tr, st.totalAbsent||0, 'px-4 py-3 text-center font-mono text-red-500');
+    td(tr, '\u20B1'+(st.totalSanctions||0).toLocaleString(),   'px-4 py-3 text-right font-mono');
+    td(tr, '\u20B1'+(st.remainingBalance||0).toLocaleString(), 'px-4 py-3 text-right font-mono font-bold text-red-500');
+
+    var badgeTd = document.createElement('td');
+    badgeTd.className = 'px-4 py-3 text-center';
+    var badge = document.createElement('span');
+    var label = cleared ? 'Cleared' : (st.remainingBalance||0) > 0 ? 'With Balance' : '\u2014';
+    badge.className = (cleared ? 'badge-cleared' : 'badge-balance') + ' text-xs font-semibold px-2 py-1 rounded-lg';
+    badge.textContent = label;
+    badgeTd.appendChild(badge);
+    tr.appendChild(badgeTd);
+    tbody.appendChild(tr);
+  });
+}
+
+/* ============================================================
+   STUDENTS TAB
+============================================================ */
+function renderStudentsTab() {
+  var tbody = document.getElementById('students-tbody');
+  var query = (document.getElementById('student-search').value || '').toLowerCase();
+  var list  = query ? students.filter(function(s){ return s.name.toLowerCase().includes(query); }) : students;
+  tbody.innerHTML = '';
+
+  if (list.length === 0) {
+    var tr = document.createElement('tr');
+    var msg = query ? 'No students match your search.' : 'No students yet.';
+    tr.innerHTML = '<td colspan="6" class="text-center py-8 text-slate-400 font-mono text-sm">'+msg+'</td>';
+    tbody.appendChild(tr);
+    return;
+  }
+
+  list.forEach(function(st, i) {
+    var tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-700/30 transition';
+
+    td(tr, i+1, 'px-4 py-3 text-xs font-mono text-slate-400');
+    var nameTd = td(tr, '', 'px-4 py-3 font-semibold');
+    nameTd.textContent = st.name;
+    td(tr, st.totalAbsent||0, 'px-4 py-3 text-center font-mono text-red-500');
+    td(tr, st.totalLate||0,   'px-4 py-3 text-center font-mono text-amber-500');
+    td(tr, '\u20B1'+(st.remainingBalance||0).toLocaleString(), 'px-4 py-3 text-right font-mono font-bold text-red-500');
+
+    var actionTd = document.createElement('td');
+    actionTd.className = 'px-4 py-3 text-center';
+
+    var editBtn = document.createElement('button');
+    editBtn.textContent = 'Edit';
+    editBtn.className = 'text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition font-semibold mr-2';
+    editBtn.dataset.action = 'edit';
+    editBtn.dataset.id     = st.id;
+    editBtn.dataset.name   = st.name;
+
+    var delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.className = 'text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-500 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 transition font-semibold';
+    delBtn.dataset.action = 'delete';
+    delBtn.dataset.id     = st.id;
+    delBtn.dataset.name   = st.name;
+
+    actionTd.appendChild(editBtn);
+    actionTd.appendChild(delBtn);
+    tr.appendChild(actionTd);
+    tbody.appendChild(tr);
+  });
+}
+
+/* ============================================================
+   STUDENT MODAL
+============================================================ */
+function openAddStudent() {
+  editingStudentId = null;
+  document.getElementById('student-modal-title').textContent = 'Add Student';
+  document.getElementById('student-name-input').value = '';
+  showModal('student-modal');
+  setTimeout(function(){ document.getElementById('student-name-input').focus(); }, 50);
+}
+
+function openEditStudent(id, name) {
+  editingStudentId = id;
+  document.getElementById('student-modal-title').textContent = 'Edit Student';
+  document.getElementById('student-name-input').value = name;
+  showModal('student-modal');
+  setTimeout(function(){ document.getElementById('student-name-input').focus(); }, 50);
+}
+
+async function submitStudent() {
+  var name = document.getElementById('student-name-input').value.trim();
+  if (!name) { toast('Name is required.', 'error'); return; }
+  try {
+    if (editingStudentId) {
+      await db.collection('students').doc(editingStudentId).update({ name: name });
+      toast('Student updated!', 'success');
+    } else {
+      await db.collection('students').add({ name: name, totalLate: 0, totalAbsent: 0, totalSanctions: 0, totalPaid: 0, remainingBalance: 0 });
+      toast('Student added!', 'success');
+    }
+    hideModal('student-modal');
+  } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+}
+
+async function deleteStudent(id, name) {
+  openConfirm('Delete student "' + name + '"? All attendance records will be removed too.', async function() {
+    try {
+      var snap = await db.collection('attendance').where('studentId', '==', id).get();
+      if (!snap.empty) {
+        var batch = db.batch();
+        snap.docs.forEach(function(d){ batch.delete(d.ref); });
+        await batch.commit();
+      }
+      await db.collection('students').doc(id).delete();
+      toast('Student deleted.', 'info');
+    } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+  });
+}
+
+/* ============================================================
+   PAYMENT MODAL
+============================================================ */
+function openPaymentModal(id, name) {
+  payingStudentId = id;
+  document.getElementById('payment-name').textContent = name;
+  document.getElementById('payment-amount').value = '';
+  showModal('payment-modal');
+  setTimeout(function(){ document.getElementById('payment-amount').focus(); }, 50);
+}
+
+async function submitPayment() {
+  var amount = parseFloat(document.getElementById('payment-amount').value);
+  if (!amount || amount <= 0) { toast('Enter a valid amount.', 'error'); return; }
+  try {
+    var doc = await db.collection('students').doc(payingStudentId).get();
+    if (!doc.exists) { toast('Student not found.', 'error'); return; }
+    var data    = doc.data();
+    var newPaid = (data.totalPaid || 0) + amount;
+    var newBal  = Math.max(0, (data.totalSanctions || 0) - newPaid);
+    await db.collection('students').doc(payingStudentId).update({ totalPaid: newPaid, remainingBalance: newBal });
+    toast('Payment of \u20B1' + amount + ' recorded!', 'success');
+    hideModal('payment-modal');
+  } catch(e) { console.error(e); toast('Error: ' + e.message, 'error'); }
+}
+
+/* ============================================================
+   CONFIRM HELPER
+============================================================ */
+function openConfirm(text, cb) {
+  document.getElementById('confirm-text').textContent = text;
+  pendingConfirm = cb;
+  showModal('confirm-modal');
+}
+
+/* ============================================================
+   EXPORT CSV
+============================================================ */
+function exportCSV() {
+  var rows = [['Rank','Student Name','Total Late','Total Absent','Total Sanctions','Total Paid','Remaining Balance','Status']];
+  sortedStudents().forEach(function(st, i) {
+    var cleared = (st.remainingBalance||0) === 0 && (st.totalSanctions||0) > 0;
+    rows.push([i+1, st.name, st.totalLate||0, st.totalAbsent||0, st.totalSanctions||0, st.totalPaid||0, st.remainingBalance||0, cleared ? 'Cleared' : 'With Balance']);
+  });
+  var csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
+  var blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = 'sanctions_' + new Date().toISOString().split('T')[0] + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV exported!', 'success');
+}
+
+/* ============================================================
+   SORTING
+============================================================ */
+function sortedStudents() {
+  return students.slice().sort(function(a,b) {
+    var d = (b.totalSanctions||0)-(a.totalSanctions||0); if (d) return d;
+    d = (b.totalAbsent||0)-(a.totalAbsent||0); if (d) return d;
+    return (b.totalLate||0)-(a.totalLate||0);
+  });
+}
+
+/* ============================================================
+   TAB NAVIGATION
+============================================================ */
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(function(t){ if(t.dataset.tab===name) t.classList.add('active'); });
+  if (name === 'dashboard') setTimeout(renderChart, 80);
+}
+
+/* ============================================================
+   MODAL HELPERS
+============================================================ */
+function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function hideModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+/* ============================================================
+   TOAST
+============================================================ */
+function toast(msg, type) {
+  var el = document.createElement('div');
+  el.className = 'toast ' + (type || 'info');
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(function(){
+    el.style.animation = 'fadeOut .3s ease forwards';
+    setTimeout(function(){ el.remove(); }, 300);
+  }, 3500);
+}
+
+/* ============================================================
+   LOADING / APP
+============================================================ */
+function showLoading() { document.getElementById('loading-overlay').style.display = 'flex'; }
+function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
+function showApp()     { document.getElementById('app').classList.remove('hidden'); }
+
+/* ============================================================
+   HELPERS
+============================================================ */
+function formatDate(s) {
+  if (!s) return '';
+  var p = s.split('-');
+  return new Date(p[0], p[1]-1, p[2]).toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
+}
+</script>
+
+<!--
+=================================================================
+FIRESTORE SECURITY RULES
+Firebase Console > Firestore Database > Rules > Paste > Publish
+=================================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /students/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /practiceDates/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /attendance/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
+-->
+</body>
+</html>
