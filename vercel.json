@@ -1,7 +1,7 @@
 {
   "redirects": [
     {
-      "source": "/((?!maintenance.html|sslg.png|.*\\.(css|js|png|jpg|jpeg|svg|webp|ico)).*)",
+      "source": "/((?!maintenance.html|sslg.png|.*\\.(png|jpg|jpeg|svg|webp|ico)).*)",
       "destination": "/maintenance.html",
       "permanent": false
     }
