@@ -1,9 +1,1 @@
-{
-  "_disabled_redirects": [
-    {
-      "source": "/((?!maintenance.html|sslg.png|.*\\.(png|jpg|jpeg|svg|webp|ico)).*)",
-      "destination": "/maintenance.html",
-      "permanent": false
-    }
-  ]
-}
+
